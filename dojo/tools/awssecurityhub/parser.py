@@ -1,10 +1,13 @@
 import json
+# import logging
 
 from dojo.tools.awssecurityhub.compliance import Compliance
 from dojo.tools.awssecurityhub.guardduty import GuardDuty
 from dojo.tools.awssecurityhub.inspector import Inspector
 from dojo.tools.parser_test import ParserTest
 
+# logger = logging.getLogger()
+# logger.setLevel("INFO")
 
 class AwsSecurityHubParser:
     ID = "AWS Security Hub"
@@ -20,15 +23,17 @@ class AwsSecurityHubParser:
 
     def get_tests(self, scan_type, scan):
         data = json.load(scan)
-        findings = data.get("Findings", data.get("findings", None))
+        findings = data.get("findings", data.get("findings", None))
         if not isinstance(findings, list):
             msg = "Incorrect Security Hub report format"
             raise TypeError(msg)
         prod = []
+        
         aws_acc = []
         for finding in findings:
             prod.append(finding.get("ProductName", "AWS Security Hub Ruleset"))
-            aws_acc.append(finding.get("AwsAccountId"))
+            aws_acc.append(finding.get("awsAccountId"))
+        
         report_date = data.get("createdAt")
         test = ParserTest(
             name=self.ID, type=self.ID, version="",
@@ -47,19 +52,25 @@ class AwsSecurityHubParser:
 
     def get_items(self, tree: dict, test):
         items = {}
-        findings = tree.get("Findings", tree.get("findings", None))
+        findings = tree.get("findings", None)
         if not isinstance(findings, list):
             msg = "Incorrect Security Hub report format"
             raise TypeError(msg)
         for node in findings:
-            aws_scanner_type = node.get("ProductFields", {}).get("aws/securityhub/ProductName", "")
+            aws_scanner_type = node.get("ProductFields", {}).get("aws/securityhub/ProductName", None)
+
+            if aws_scanner_type == None:
+                if "inspectorScore" in node.keys():
+                    aws_scanner_type = "Inspector"
+
             if aws_scanner_type == "Inspector":
+                # logger.info("Importing Inspector Findings")
                 item = Inspector().get_item(node, test)
             elif aws_scanner_type == "GuardDuty":
                 item = GuardDuty().get_item(node, test)
             else:
                 item = Compliance().get_item(node, test)
-            key = node["Id"]
+            key = node["findingArn"]
             if not isinstance(key, str):
                 msg = "Incorrect Security Hub report format"
                 raise TypeError(msg)

@@ -3,7 +3,12 @@ from datetime import datetime
 from dojo.models import Finding
 
 
+component_name = None
+
 class Compliance:
+    def __init__(self):
+        self.component_name = None
+
     def get_item(self, finding: dict, test):
         finding_id = finding.get("Id", "")
         title = finding.get("Title", "")
@@ -42,7 +47,7 @@ class Compliance:
             active = True
         title_suffix = ""
         for resource in finding.get("Resources", []):
-            component_name = resource.get("Type")
+            self.component_name = resource.get("Type")
             if component_name == "AwsEcrContainerImage":
                 details = resource.get("Details", {}).get("AwsEcrContainerImage")
                 arn = resource.get("Id")
@@ -75,7 +80,7 @@ class Compliance:
             is_mitigated=is_Mitigated,
             static_finding=True,
             dynamic_finding=False,
-            component_name=component_name,
+            component_name=self.component_name,
         )
         if epss_score is not None:
             result.epss_score = epss_score
